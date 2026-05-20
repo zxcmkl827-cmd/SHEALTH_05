@@ -19,6 +19,7 @@ constexpr int OverweightCode = 300;
 constexpr int ObesityCode = 400;
 constexpr double CentimetersPerMeter = 100.0;
 constexpr std::size_t ExpectedColumnCount = 4;
+constexpr std::size_t IdColumn = 0;
 constexpr std::size_t AgeColumn = 1;
 constexpr std::size_t WeightColumn = 2;
 constexpr std::size_t HeightColumn = 3;
@@ -46,8 +47,10 @@ int SHealth::calculateBmi(const std::string& filename) {
 
     records = std::move(*loadedRecords);
     imputeMissingWeights();
+    imputeMissingHeights();
     calculateBmiValues();
     ratiosByAgeClass = aggregateRatios();
+    overallRatios = calculateOverallRatioSet();
 
     return static_cast<int>(records.size());
 }
@@ -60,6 +63,25 @@ double SHealth::getBmiRatio(int ageClass, int type) {
     }
 
     return ratioIt->second.values[static_cast<std::size_t>(*category)];
+}
+
+double SHealth::getOverallBmiRatio(int type) {
+    const auto category = categoryFromType(type);
+    if (!category) {
+        return 0.0;
+    }
+
+    return overallRatios.values[static_cast<std::size_t>(*category)];
+}
+
+std::vector<SHealth::BmiUser> SHealth::getNormalBmiUsers() const {
+    std::vector<BmiUser> normalUsers;
+    for (const auto& record : records) {
+        if (record.bmi > 0.0 && bmiClassifier->classify(record.bmi) == BmiCategory::Normal) {
+            normalUsers.push_back(record);
+        }
+    }
+    return normalUsers;
 }
 
 std::vector<std::string> SHealth::split(const std::string& line, char delimiter) {
@@ -75,16 +97,17 @@ std::vector<std::string> SHealth::split(const std::string& line, char delimiter)
 void SHealth::resetState() {
     records.clear();
     ratiosByAgeClass.clear();
+    overallRatios = RatioSet{};
 }
 
-std::optional<std::vector<SHealth::HealthRecord>> SHealth::loadRecords(
+std::optional<std::vector<SHealth::BmiUser>> SHealth::loadRecords(
     const std::string& filename) {
     std::ifstream file(filename);
     if (!file.is_open()) {
         return std::nullopt;
     }
 
-    std::vector<HealthRecord> loadedRecords;
+    std::vector<BmiUser> loadedRecords;
     std::string line;
     std::getline(file, line);
     while (std::getline(file, line)) {
@@ -99,18 +122,19 @@ std::optional<std::vector<SHealth::HealthRecord>> SHealth::loadRecords(
     return loadedRecords;
 }
 
-std::optional<SHealth::HealthRecord> SHealth::parseRecord(const std::string& line) {
+std::optional<SHealth::BmiUser> SHealth::parseRecord(const std::string& line) {
     const auto tokens = split(line, CsvDelimiter);
     if (tokens.size() < ExpectedColumnCount) {
         return std::nullopt;
     }
 
     try {
-        HealthRecord record;
+        BmiUser record;
+        record.id = tokens[IdColumn];
         record.age = std::stoi(tokens[AgeColumn]);
         record.weight = std::stod(tokens[WeightColumn]);
         record.height = std::stod(tokens[HeightColumn]);
-        if (record.weight < 0.0 || record.height <= 0.0) {
+        if (record.weight < 0.0 || record.height < 0.0) {
             return std::nullopt;
         }
         return record;
@@ -138,6 +162,25 @@ std::map<int, double> SHealth::calculateAverageWeights() const {
     return averages;
 }
 
+std::map<int, double> SHealth::calculateAverageHeights() const {
+    std::map<int, double> totals;
+    std::map<int, int> counts;
+    for (const auto& record : records) {
+        const int ageClass = toAgeClass(record.age);
+        if (ageClass == 0 || record.height == 0.0) {
+            continue;
+        }
+        totals[ageClass] += record.height;
+        counts[ageClass]++;
+    }
+
+    std::map<int, double> averages;
+    for (const auto& [ageClass, total] : totals) {
+        averages[ageClass] = total / counts[ageClass];
+    }
+    return averages;
+}
+
 void SHealth::imputeMissingWeights() {
     const auto averages = calculateAverageWeights();
     for (auto& record : records) {
@@ -145,6 +188,17 @@ void SHealth::imputeMissingWeights() {
         const auto average = averages.find(ageClass);
         if (record.weight == 0.0 && average != averages.end()) {
             record.weight = average->second;
+        }
+    }
+}
+
+void SHealth::imputeMissingHeights() {
+    const auto averages = calculateAverageHeights();
+    for (auto& record : records) {
+        const int ageClass = toAgeClass(record.age);
+        const auto average = averages.find(ageClass);
+        if (record.height == 0.0 && average != averages.end()) {
+            record.height = average->second;
         }
     }
 }
@@ -170,6 +224,25 @@ SHealth::RatioSet SHealth::calculateRatioSet(int ageClass) const {
 
     for (const auto& record : records) {
         if (toAgeClass(record.age) != ageClass || record.bmi <= 0.0) {
+            continue;
+        }
+        counts[static_cast<std::size_t>(bmiClassifier->classify(record.bmi))]++;
+        total++;
+    }
+
+    for (std::size_t i = 0; i < counts.size(); ++i) {
+        ratioSet.values[i] = percentage(counts[i], total);
+    }
+    return ratioSet;
+}
+
+SHealth::RatioSet SHealth::calculateOverallRatioSet() const {
+    RatioSet ratioSet;
+    std::array<int, 4> counts{};
+    int total = 0;
+
+    for (const auto& record : records) {
+        if (record.bmi <= 0.0) {
             continue;
         }
         counts[static_cast<std::size_t>(bmiClassifier->classify(record.bmi))]++;

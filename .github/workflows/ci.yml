@@ -18,5 +18,15 @@ jobs:
       - name: Build
         run: cmake --build build --config Release
 
-      - name: Test
+      - name: Run unit and golden master tests
         run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Upload ApprovalTests received files
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: approvaltests-received
+          path: |
+            src/test/cpp/approval_tests/*.received.txt
+            src/test/cpp/golden_master/*.received.txt
+          if-no-files-found: ignore

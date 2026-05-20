@@ -49,8 +49,15 @@ target_compile_definitions(SHealthGoldenMasterTest PRIVATE
     SHEALTH_GOLDEN_DATA_FILE="${CMAKE_SOURCE_DIR}/shealth.dat"
     SHEALTH_GOLDEN_EXECUTABLE_FILE="$<TARGET_FILE:SHealthBMI>"
     SHEALTH_GOLDEN_WORKING_DIR="${CMAKE_SOURCE_DIR}"
+    SHEALTH_GOLDEN_EXPECTED_DIR="${CMAKE_SOURCE_DIR}/src/test/cpp/golden_master"
 )
+add_dependencies(SHealthGoldenMasterTest SHealthBMI)
 
 include(GoogleTest)
-gtest_discover_tests(SHealthBMITest)
-gtest_discover_tests(SHealthGoldenMasterTest)
+gtest_discover_tests(SHealthBMITest
+    PROPERTIES LABELS "unit"
+)
+gtest_discover_tests(SHealthGoldenMasterTest
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    PROPERTIES LABELS "golden-master"
+)

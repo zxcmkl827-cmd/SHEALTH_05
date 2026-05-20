@@ -1,28 +1,55 @@
 #pragma once
 
+#include "BmiClassifier.h"
+#include <array>
+#include <map>
+#include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 class SHealth {
 public:
+    struct BmiUser {
+        std::string id;
+        int age = 0;
+        double weight = 0.0;
+        double height = 0.0;
+        double bmi = 0.0;
+    };
+
+    SHealth();
+    explicit SHealth(std::unique_ptr<BmiClassifier> classifier);
+
     int calculateBmi(const std::string& filename);
     double getBmiRatio(int ageClass, int type);
+    double getOverallBmiRatio(int type);
+    std::vector<BmiUser> getNormalBmiUsers() const;
 
 private:
-    int count = 0;
-    int ages[10000];
-    double heights[10000];
-    double weights[10000];
-    double bmis[10000];
+    struct RatioSet {
+        std::array<double, 4> values{};
+    };
 
-    double underweight20 = 0, underweight30 = 0, underweight40 = 0;
-    double underweight50 = 0, underweight60 = 0, underweight70 = 0;
-    double normalweight20 = 0, normalweight30 = 0, normalweight40 = 0;
-    double normalweight50 = 0, normalweight60 = 0, normalweight70 = 0;
-    double overweight20 = 0, overweight30 = 0, overweight40 = 0;
-    double overweight50 = 0, overweight60 = 0, overweight70 = 0;
-    double obesity20 = 0, obesity30 = 0, obesity40 = 0;
-    double obesity50 = 0, obesity60 = 0, obesity70 = 0;
+    std::vector<BmiUser> records;
+    std::map<int, RatioSet> ratiosByAgeClass;
+    RatioSet overallRatios;
+    std::unique_ptr<BmiClassifier> bmiClassifier;
 
     std::vector<std::string> split(const std::string& line, char delimiter);
+    void resetState();
+    std::optional<std::vector<BmiUser>> loadRecords(const std::string& filename);
+    std::optional<BmiUser> parseRecord(const std::string& line);
+    std::map<int, double> calculateAverageWeights() const;
+    std::map<int, double> calculateAverageHeights() const;
+    void imputeMissingWeights();
+    void imputeMissingHeights();
+    void calculateBmiValues();
+    std::map<int, RatioSet> aggregateRatios() const;
+    RatioSet calculateRatioSet(int ageClass) const;
+    RatioSet calculateOverallRatioSet() const;
+    int toAgeClass(int age) const;
+    double percentage(int part, int total) const;
+    double calculateBmiValue(double weight, double height) const;
+    std::optional<BmiCategory> categoryFromType(int type) const;
 };

@@ -1,0 +1,6 @@
+20 - underweight = 3.511053, normal = 23.797139, overweight = 11.833550, obesity = 60.858257
+30 - underweight = 1.863354, normal = 15.527950, overweight = 10.062112, obesity = 72.546584
+40 - underweight = 0.521512, normal = 10.039113, overweight = 9.126467, obesity = 80.312907
+50 - underweight = 2.181401, normal = 12.629162, overweight = 9.988519, obesity = 75.200918
+60 - underweight = 0.862895, normal = 8.533078, overweight = 10.642378, obesity = 79.961649
+70 - underweight = 0.529101, normal = 12.345679, overweight = 10.758377, obesity = 76.366843
